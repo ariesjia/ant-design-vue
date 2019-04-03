@@ -70,19 +70,21 @@ const AjaxUploader = {
       if (e.type === 'dragover') {
         return;
       }
-      if (this.directory) {
-        traverseFileTree(e.dataTransfer.items, this.uploadFiles, _file =>
-          attrAccept(_file, this.accept),
-        );
-      } else {
-        const files = partition(Array.prototype.slice.call(e.dataTransfer.files), file =>
+      const readFilePromise = this.directory ? traverseFileTree(
+        e.dataTransfer.items,
+        this.uploadFiles,
+        _file => attrAccept(_file, this.accept),
+      ) : Promise.resolve(
+        partition(Array.prototype.slice.call(e.dataTransfer.files), file =>
           attrAccept(file, this.accept),
-        );
+        )
+      )
+      readFilePromise.then((files) => {
         this.uploadFiles(files[0]);
         if (files[1].length) {
           this.$emit('reject', files[1]);
         }
-      }
+      });
     },
     uploadFiles(files) {
       const postFiles = Array.prototype.slice.call(files);

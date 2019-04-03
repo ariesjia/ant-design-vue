@@ -1,3 +1,5 @@
+import reduce from 'lodash/reduce';
+
 function loopFiles(item, callback) {
   const dirReader = item.createReader();
   let fileList = [];
@@ -22,25 +24,34 @@ function loopFiles(item, callback) {
 }
 
 const traverseFileTree = (files, callback, isAccepted) => {
-  const _traverseFileTree = (item, path) => {
+  const fileGroups = [[], []];
+  const _traverseFileTree = (item, path) => new Promise((resolve) => {
     path = path || '';
     if (item.isFile) {
       item.file(file => {
-        if (isAccepted(file)) {
+        const accepted = isAccepted(file);
+        if (accepted) {
           callback([file]);
+        } else {
+          fileGroups[1].push(file);
         }
+        resolve(fileGroups);
       });
     } else if (item.isDirectory) {
       loopFiles(item, entries => {
-        entries.forEach(entryItem => {
-          _traverseFileTree(entryItem, `${path}${item.name}/`);
+        Promise.all(
+          entries.map(entryItem => _traverseFileTree(entryItem, `${path}${item.name}/`))
+        ).then((s) => {
+          resolve(fileGroups);
         });
       });
     }
-  };
-  for (const file of files) {
-    _traverseFileTree(file.webkitGetAsEntry());
-  }
-};
+  });
 
+  return reduce(files, (prev, file) => {
+    return prev.then(() => {
+      return _traverseFileTree(file.webkitGetAsEntry());
+    });
+  }, Promise.resolve());
+};
 export default traverseFileTree;
